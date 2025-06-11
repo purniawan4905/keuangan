@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { Guitar as Hospital, Eye, EyeOff } from 'lucide-react';
+import { Guitar as Hospital, Eye, EyeOff, User, Shield, DollarSign } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
@@ -38,17 +38,36 @@ const LoginForm: React.FC = () => {
     }));
   };
 
+  const handleDemoLogin = async (role: 'admin' | 'finance' | 'viewer') => {
+    const demoCredentials = {
+      admin: { email: 'admin@hospital.com', password: 'password' },
+      finance: { email: 'finance@hospital.com', password: 'password' },
+      viewer: { email: 'viewer@hospital.com', password: 'password' }
+    };
+
+    setFormData(demoCredentials[role]);
+    setLoading(true);
+
+    try {
+      const success = await login(demoCredentials[role].email, demoCredentials[role].password);
+      if (success) {
+        toast.success(`Login berhasil sebagai ${role}!`);
+      } else {
+        toast.error('Demo login gagal');
+      }
+    } catch (error) {
+      toast.error('Terjadi kesalahan saat demo login');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
-          {/* <div className="flex justify-center">
-            <div className="bg-blue-600 p-3 rounded-full">
-              <Hospital className="h-8 w-8 text-white" />
-            </div>
-          </div> */}
           <img
-            src="https://pendaftaran.rsusebeningkasih.com/assets/images/logo-laporan.png"  /* ganti path sesuai lokasi logo */
+            src="https://pendaftaran.rsusebeningkasih.com/assets/images/logo-laporan.png"
             alt="Logo Rumah Sakit"
             className="mx-auto mt-6 h-12 w-auto"
             draggable={false}
@@ -130,10 +149,38 @@ const LoginForm: React.FC = () => {
               </p>
             </div>
 
-            <div className="mt-4 p-4 bg-blue-50 rounded-lg">
-              <p className="text-xs text-blue-800 font-medium">Demo Login:</p>
-              <p className="text-xs text-blue-700">Email: admin@hospital.com</p>
-              <p className="text-xs text-blue-700">Password: password</p>
+            {/* Demo Login Section */}
+            <div className="mt-6 pt-6 border-t border-gray-200">
+              <p className="text-xs text-gray-600 font-medium mb-3 text-center">Demo Login:</p>
+              <div className="grid grid-cols-1 gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleDemoLogin('admin')}
+                  disabled={loading}
+                  className="flex items-center justify-center gap-2 w-full px-3 py-2 text-xs font-medium text-purple-700 bg-purple-50 border border-purple-200 rounded-md hover:bg-purple-100 transition-colors disabled:opacity-50"
+                >
+                  <Shield className="h-3 w-3" />
+                  Admin (Semua Akses)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDemoLogin('finance')}
+                  disabled={loading}
+                  className="flex items-center justify-center gap-2 w-full px-3 py-2 text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded-md hover:bg-green-100 transition-colors disabled:opacity-50"
+                >
+                  <DollarSign className="h-3 w-3" />
+                  Finance (Buat & Edit Laporan)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDemoLogin('viewer')}
+                  disabled={loading}
+                  className="flex items-center justify-center gap-2 w-full px-3 py-2 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 transition-colors disabled:opacity-50"
+                >
+                  <User className="h-3 w-3" />
+                  Viewer (Hanya Lihat)
+                </button>
+              </div>
             </div>
           </div>
         </form>

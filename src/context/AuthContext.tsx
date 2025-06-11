@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User } from '../types';
+import authService, { LoginCredentials, RegisterData } from '../services/authService';
 
 interface AuthContextType {
   user: User | null;
@@ -7,14 +8,11 @@ interface AuthContextType {
   register: (userData: RegisterData) => Promise<boolean>;
   logout: () => void;
   loading: boolean;
-}
-
-interface RegisterData {
-  name: string;
-  email: string;
-  password: string;
-  role: 'admin' | 'finance' | 'viewer';
-  hospitalId: string;
+  hasPermission: (permission: string) => boolean;
+  isAdmin: () => boolean;
+  isFinance: () => boolean;
+  canEdit: () => boolean;
+  canApprove: () => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -23,36 +21,72 @@ interface AuthProviderProps {
   children: ReactNode;
 }
 
+// Role-based permissions
+const PERMISSIONS = {
+  admin: [
+    'create_report',
+    'edit_report',
+    'delete_report',
+    'approve_report',
+    'view_all_reports',
+    'manage_users',
+    'manage_settings',
+    'export_reports',
+    'archive_reports'
+  ],
+  finance: [
+    'create_report',
+    'edit_report',
+    'view_all_reports',
+    'export_reports',
+    'submit_for_approval'
+  ],
+  viewer: [
+    'view_reports',
+    'export_reports'
+  ]
+};
+
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check for stored user session
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
-    setLoading(false);
+    checkAuthStatus();
   }, []);
+
+  const checkAuthStatus = async () => {
+    try {
+      const token = localStorage.getItem('authToken');
+      if (token) {
+        const result = await authService.verifyToken(token);
+        if (result.valid && result.user) {
+          setUser(result.user);
+        } else {
+          localStorage.removeItem('authToken');
+          localStorage.removeItem('user');
+        }
+      }
+    } catch (error) {
+      console.error('Auth check error:', error);
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('user');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
-      // Mock authentication - in real app, call your API
-      if (email === 'admin@hospital.com' && password === 'password') {
-        const mockUser: User = {
-          _id: '1',
-          email,
-          name: 'Administrator',
-          role: 'admin',
-          hospitalId: 'hospital-1',
-          createdAt: new Date()
-        };
-        
-        setUser(mockUser);
-        localStorage.setItem('user', JSON.stringify(mockUser));
+      const result = await authService.login({ email, password });
+      
+      if (result.success && result.user && result.token) {
+        setUser(result.user);
+        localStorage.setItem('authToken', result.token);
+        localStorage.setItem('user', JSON.stringify(result.user));
         return true;
       }
+      
       return false;
     } catch (error) {
       console.error('Login error:', error);
@@ -62,19 +96,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const register = async (userData: RegisterData): Promise<boolean> => {
     try {
-      // Mock registration - in real app, call your API
-      const mockUser: User = {
-        _id: Math.random().toString(36).substr(2, 9),
-        email: userData.email,
-        name: userData.name,
-        role: userData.role,
-        hospitalId: userData.hospitalId,
-        createdAt: new Date()
-      };
+      const result = await authService.register(userData);
       
-      setUser(mockUser);
-      localStorage.setItem('user', JSON.stringify(mockUser));
-      return true;
+      if (result.success && result.user && result.token) {
+        setUser(result.user);
+        localStorage.setItem('authToken', result.token);
+        localStorage.setItem('user', JSON.stringify(result.user));
+        return true;
+      }
+      
+      return false;
     } catch (error) {
       console.error('Registration error:', error);
       return false;
@@ -83,11 +114,44 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const logout = () => {
     setUser(null);
+    localStorage.removeItem('authToken');
     localStorage.removeItem('user');
   };
 
+  const hasPermission = (permission: string): boolean => {
+    if (!user) return false;
+    return PERMISSIONS[user.role]?.includes(permission) || false;
+  };
+
+  const isAdmin = (): boolean => {
+    return user?.role === 'admin' || false;
+  };
+
+  const isFinance = (): boolean => {
+    return user?.role === 'finance' || false;
+  };
+
+  const canEdit = (): boolean => {
+    return hasPermission('edit_report');
+  };
+
+  const canApprove = (): boolean => {
+    return hasPermission('approve_report');
+  };
+
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, loading }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      login, 
+      register, 
+      logout, 
+      loading,
+      hasPermission,
+      isAdmin,
+      isFinance,
+      canEdit,
+      canApprove
+    }}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,6 +1,6 @@
 import React, { ReactNode, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { LogOut, Guitar as Hospital, BarChart3, FileText, Settings, User, AlertTriangle } from 'lucide-react';
+import { LogOut, Guitar as Hospital, BarChart3, FileText, Settings, User, AlertTriangle, Shield, DollarSign, Eye } from 'lucide-react';
 import { useLocation, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
@@ -9,14 +9,14 @@ interface LayoutProps {
 }
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
-  const { user, logout } = useAuth();
+  const { user, logout, hasPermission, isAdmin, isFinance } = useAuth();
   const location = useLocation();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   const navigation = [
-    { name: 'Dashboard', href: '/dashboard', icon: BarChart3 },
-    { name: 'Laporan', href: '/reports', icon: FileText },
-    { name: 'Pengaturan', href: '/settings', icon: Settings },
+    { name: 'Dashboard', href: '/dashboard', icon: BarChart3, permission: 'view_reports' },
+    { name: 'Laporan', href: '/reports', icon: FileText, permission: 'view_reports' },
+    { name: 'Pengaturan', href: '/settings', icon: Settings, permission: 'manage_settings' },
   ];
 
   const handleLogoutClick = () => {
@@ -37,6 +37,50 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     toast.success('Logout dibatalkan');
   };
 
+  const getRoleIcon = (role: string) => {
+    switch (role) {
+      case 'admin':
+        return <Shield className="h-4 w-4 text-purple-600" />;
+      case 'finance':
+        return <DollarSign className="h-4 w-4 text-green-600" />;
+      case 'viewer':
+        return <Eye className="h-4 w-4 text-blue-600" />;
+      default:
+        return <User className="h-4 w-4 text-gray-600" />;
+    }
+  };
+
+  const getRoleColor = (role: string) => {
+    switch (role) {
+      case 'admin':
+        return 'text-purple-600 bg-purple-50';
+      case 'finance':
+        return 'text-green-600 bg-green-50';
+      case 'viewer':
+        return 'text-blue-600 bg-blue-50';
+      default:
+        return 'text-gray-600 bg-gray-50';
+    }
+  };
+
+  const getRoleLabel = (role: string) => {
+    switch (role) {
+      case 'admin':
+        return 'Administrator';
+      case 'finance':
+        return 'Finance';
+      case 'viewer':
+        return 'Viewer';
+      default:
+        return role;
+    }
+  };
+
+  // Filter navigation based on permissions
+  const filteredNavigation = navigation.filter(item => 
+    hasPermission(item.permission)
+  );
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Sidebar */}
@@ -55,7 +99,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         
         <nav className="mt-8">
           <div className="space-y-1 px-4">
-            {navigation.map((item) => {
+            {filteredNavigation.map((item) => {
               const isActive = location.pathname === item.href;
               return (
                 <Link
@@ -80,6 +124,36 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           </div>
         </nav>
 
+        {/* Role-based access indicator */}
+        <div className="absolute bottom-20 left-0 right-0 px-4">
+          <div className={`p-3 rounded-lg ${getRoleColor(user?.role || '')}`}>
+            <div className="flex items-center gap-2">
+              {getRoleIcon(user?.role || '')}
+              <div className="flex-1">
+                <p className="text-xs font-medium">Akses Level</p>
+                <p className="text-sm font-semibold">{getRoleLabel(user?.role || '')}</p>
+              </div>
+            </div>
+            <div className="mt-2 text-xs">
+              {isAdmin() && (
+                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                  Akses Penuh
+                </span>
+              )}
+              {isFinance() && (
+                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                  Kelola Laporan
+                </span>
+              )}
+              {user?.role === 'viewer' && (
+                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                  Hanya Lihat
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
         {/* User info and logout */}
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200">
           <div className="flex items-center">
@@ -90,7 +164,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             </div>
             <div className="ml-3 flex-1">
               <p className="text-sm font-medium text-gray-900">{user?.name}</p>
-              <p className="text-xs text-gray-500 capitalize">{user?.role}</p>
+              <p className="text-xs text-gray-500">{user?.email}</p>
             </div>
             <button
               onClick={handleLogoutClick}
